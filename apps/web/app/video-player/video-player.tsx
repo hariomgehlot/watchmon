@@ -2,9 +2,9 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Volume2, VolumeX, SkipBack, SkipForward, Maximize, Settings } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
-import { Card } from '@/components/ui/card';
+import { Button } from '@repo/ui/button';
+import { Slider } from '@repo/ui/slider';
+import { Card } from '@repo/ui/card';
 
 interface VideoPlayerProps {
   src: string;

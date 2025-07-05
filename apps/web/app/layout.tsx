@@ -1,8 +1,7 @@
-import './globals.css';
+import './globals.scss';
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
-
-const inter = Inter({ subsets: ['latin'] });
+// import { Inter } from 'next/font/google';
+// const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'StreamSync - Watch Together',
@@ -16,7 +15,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
-      <body className={inter.className}>{children}</body>
+      <body className={''}>{children}</body>
     </html>
   );
 }

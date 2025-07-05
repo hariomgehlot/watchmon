@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import { ArrowLeft, Upload, Play, Check } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Button } from '@repo/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/card';
+import { Input } from '@repo/ui/input';
+import { Label } from '@repo/ui/label';
 import { useRouter } from 'next/navigation';
-import { VideoPlayer } from '@/components/video-player';
+import { VideoPlayer } from '@repo/video-player';
 
 export default function CreateRoom() {
   const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
