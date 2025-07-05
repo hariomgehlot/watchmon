@@ -4,9 +4,13 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "dev:web": "turbo run dev --filter=web",
+    "dev:api": "turbo run dev --filter=backend",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "check-types": "turbo run check-types"
+    "check-types": "turbo run check-types",
+    "clean:install": "rm -rf node_modules pnpm-lock.yaml && pnpm install",
+    "clean:apps": "rm -rf apps/backend/node_modules apps/backend/dist apps/web/node_modules apps/web/.next && pnpm run clean:install "
   },
   "devDependencies": {
     "prettier": "^3.6.0",
