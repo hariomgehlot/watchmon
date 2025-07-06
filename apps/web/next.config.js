@@ -5,6 +5,7 @@
  */
 
 const nextConfig = {
+  transpilePackages: ['@repo/ui','@repo/lib'],
   async rewrites() {
     // Use process.env.BACKEND_URL or fallback to '' (relative, same origin)
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || '';
