@@ -9,7 +9,9 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
   const socketRef = useRef<SocketIOClientSocket | null>(null);
 
   if (!socketRef.current) {
-    socketRef.current = io('http://localhost:3001');
+    // Use NEXT_PUBLIC_BACKEND_URL if set, otherwise connect to same origin
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+    socketRef.current = backendUrl ? io(backendUrl) : io();
   }
 
   useEffect(() => {

@@ -158,7 +158,8 @@ function HomeImpl() {
 export default function Home(props: any) {
   return (
     <UserIdProvider>
-      <HomeImpl {...props} />
+      <HomeImpl /* @next-codemod-error 'props' is used with spread syntax (...). Any asynchronous properties of 'props' must be awaited when accessed. */
+      {...props} />
     </UserIdProvider>
   );
 }

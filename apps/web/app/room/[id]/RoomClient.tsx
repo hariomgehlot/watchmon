@@ -36,6 +36,7 @@ function RoomClientImpl({ roomId }: { roomId: string }) {
     });
     // Handle signaling
     const onSignal = async ({ from, signal }: { from: string; signal: any }) => {
+      console.log('[VIEWER] Received signal from', from, signal);
       if (!peerRef.current) {
         // Only create peer on offer
         if (signal.type === 'offer') {
@@ -44,23 +45,31 @@ function RoomClientImpl({ roomId }: { roomId: string }) {
           peerRef.current = peer;
           // Handle remote stream
           peer.ontrack = (e) => {
+            console.log('[VIEWER] Received remote track', e.streams[0]);
             setMediaStream(e.streams[0] || null);
           };
           // Send ICE candidates
           peer.onicecandidate = (e) => {
             if (e.candidate && hostId) {
+              console.log('[VIEWER] Sending ICE candidate to', hostId, e.candidate);
               socket.emit('signal', { roomId, from: userId, to: hostId, signal: { candidate: e.candidate } });
             }
           };
           await peer.setRemoteDescription(new RTCSessionDescription(signal));
+          console.log('[VIEWER] Set remote description (offer)', peer.remoteDescription);
           const answer = await peer.createAnswer();
+          console.log('[VIEWER] Created answer', answer);
           await peer.setLocalDescription(answer);
+          console.log('[VIEWER] Set local description (answer)', peer.localDescription);
           socket.emit('signal', { roomId, from: userId, to: from, signal: answer });
         }
       } else {
         // Handle ICE
         if (signal.candidate) {
-          peerRef.current.addIceCandidate(new RTCIceCandidate(signal.candidate));
+          console.log('[VIEWER] Received ICE candidate from', from, signal.candidate);
+          peerRef.current.addIceCandidate(new RTCIceCandidate(signal.candidate)).then(() => {
+            console.log('[VIEWER] Added ICE candidate from', from);
+          });
         }
       }
     };

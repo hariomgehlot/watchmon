@@ -47,16 +47,22 @@ function CreateRoomImpl() {
       const peer = new RTCPeerConnection();
       peerConnections.current[viewerId] = peer;
       // Add all tracks
-      mediaStream.getTracks().forEach((track: MediaStreamTrack) => peer.addTrack(track, mediaStream));
+      mediaStream.getTracks().forEach((track: MediaStreamTrack) => {
+        console.log('[HOST] Adding track to peer', viewerId, track);
+        peer.addTrack(track, mediaStream);
+      });
       // Send ICE candidates
       peer.onicecandidate = (e) => {
         if (e.candidate) {
+          console.log('[HOST] Sending ICE candidate to', viewerId, e.candidate);
           socket.emit('signal', { roomId, from: userId, to: viewerId, signal: { candidate: e.candidate } });
         }
       };
       // Create offer and send to viewer
       const offer = await peer.createOffer();
+      console.log('[HOST] Created offer for', viewerId, offer);
       await peer.setLocalDescription(offer);
+      console.log('[HOST] Set local description for', viewerId, peer.localDescription);
       socket.emit('signal', { roomId, from: userId, to: viewerId, signal: offer });
     };
     socket.on('viewerJoined', onViewerJoined);
@@ -72,9 +78,15 @@ function CreateRoomImpl() {
       const peer = peerConnections.current[from];
       if (!peer) return;
       if (signal.type === 'answer') {
-        peer.setRemoteDescription(new RTCSessionDescription(signal));
+        console.log('[HOST] Received answer from', from, signal);
+        peer.setRemoteDescription(new RTCSessionDescription(signal)).then(() => {
+          console.log('[HOST] Set remote description (answer) for', from, peer.remoteDescription);
+        });
       } else if (signal.candidate) {
-        peer.addIceCandidate(new RTCIceCandidate(signal.candidate));
+        console.log('[HOST] Received ICE candidate from', from, signal.candidate);
+        peer.addIceCandidate(new RTCIceCandidate(signal.candidate)).then(() => {
+          console.log('[HOST] Added ICE candidate from', from);
+        });
       }
     };
     socket.on('signal', onSignal);
@@ -267,7 +279,8 @@ function CreateRoomImpl() {
 export default function CreateRoom(props: any) {
   return (
     <UserIdProvider>
-      <CreateRoomImpl {...props} />
+      <CreateRoomImpl /* @next-codemod-error 'props' is used with spread syntax (...). Any asynchronous properties of 'props' must be awaited when accessed. */
+      {...props} />
     </UserIdProvider>
   );
 }
