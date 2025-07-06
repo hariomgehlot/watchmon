@@ -27,6 +27,7 @@ function CreateRoomImpl() {
   const socket = useSocket();
   const userId = useContext(UserIdContext);
   const peerConnections = useRef<{ [viewerId: string]: RTCPeerConnection }>({});
+  const isRemoteActionRef = useRef(false);
 
   // Set playbackUrl when selectedVideo changes
   useEffect(() => {
@@ -95,15 +96,22 @@ function CreateRoomImpl() {
       if (!peer) return;
       if (signal.type === "answer") {
         console.log("[HOST] Received answer from", from, signal);
-        peer
-          .setRemoteDescription(new RTCSessionDescription(signal))
-          .then(() => {
-            console.log(
-              "[HOST] Set remote description (answer) for",
-              from,
-              peer.remoteDescription
-            );
-          });
+        if (!peer.remoteDescription || peer.signalingState !== "stable") {
+          peer
+            .setRemoteDescription(new RTCSessionDescription(signal))
+            .then(() => {
+              console.log(
+                "[HOST] Set remote description (answer) for",
+                from,
+                peer.remoteDescription
+              );
+            })
+            .catch((err) => {
+              console.error("[HOST] Failed to set remote description (answer):", err);
+            });
+        } else {
+          console.log("[HOST] Ignored duplicate answer for", from);
+        }
       } else if (signal.candidate) {
         console.log(
           "[HOST] Received ICE candidate from",
@@ -124,7 +132,7 @@ function CreateRoomImpl() {
   // Listen for roomCreated event only after requesting room creation
   useEffect(() => {
     if (!socket) return;
-    const onRoomCreated = ({ roomId }: { roomId: string }) => {
+    const onRoomCreated = ({ roomId, videoName }: { roomId: string; videoName?: string }) => {
       setRoomId(roomId);
       socket.emit("joinRoom", { roomId, userId });
       setJoined(true);
@@ -176,23 +184,33 @@ function CreateRoomImpl() {
       userId: string;
     }) => {
       if (!videoRef.current) return;
+      isRemoteActionRef.current = true;
       if (action === "play") {
         videoRef.current.play();
       } else if (action === "pause") {
         videoRef.current.pause();
       }
+      setTimeout(() => {
+        isRemoteActionRef.current = false;
+      }, 0);
     };
     socket.on("playPause", onPlayPause);
     return () => {
       socket.off("playPause", onPlayPause);
     };
   }, [socket]);
+
   const handlePlay = () => {
-    socket.emit("playPause", { roomId, action: "play", userId });
+    if (!isRemoteActionRef.current) {
+      socket.emit("playPause", { roomId, action: "play", userId });
+    }
   };
   const handlePause = () => {
-    socket.emit("playPause", { roomId, action: "pause", userId });
+    if (!isRemoteActionRef.current) {
+      socket.emit("playPause", { roomId, action: "pause", userId });
+    }
   };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -216,7 +234,7 @@ function CreateRoomImpl() {
     if (!userId || !socket || !selectedVideo) return;
     setIsCreating(true);
     setIsStarting(true);
-    socket.emit("createRoom", { userId });
+    socket.emit("createRoom", { userId, videoName: selectedVideo.name });
     // roomCreated event will handle the rest
   };
 
@@ -246,7 +264,7 @@ function CreateRoomImpl() {
             Back
           </Button>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-            Create Room
+            Create Show
           </h1>
         </div>
 

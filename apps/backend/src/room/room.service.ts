@@ -4,6 +4,7 @@ import { Injectable } from '@nestjs/common';
 interface Room {
   id: string;
   users: string[];
+  videoName?: string;
 }
 
 @Injectable()
@@ -11,9 +12,9 @@ export class RoomService {
   private rooms: Map<string, Room> = new Map();
   public userSockets: Map<string, string> = new Map();
 
-  createRoom(roomId: string, userId: string) {
+  createRoom(roomId: string, userId: string, videoName?: string) {
     if (!this.rooms.has(roomId)) {
-      this.rooms.set(roomId, { id: roomId, users: [userId] });
+      this.rooms.set(roomId, { id: roomId, users: [userId], videoName });
     }
   }
 
@@ -51,5 +52,9 @@ export class RoomService {
     }
     // Remove socket mapping
     this.userSockets.delete(userId);
+  }
+
+  getVideoName(roomId: string): string | undefined {
+    return this.rooms.get(roomId)?.videoName;
   }
 } 

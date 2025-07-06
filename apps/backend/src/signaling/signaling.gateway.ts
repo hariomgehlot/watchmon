@@ -15,11 +15,11 @@ export class SignalingGateway implements OnGatewayDisconnect {
   ) {}
 
   @SubscribeMessage('createRoom')
-  async handleCreateRoom(@MessageBody() data: { userId: string }, @ConnectedSocket() client: Socket) {
+  async handleCreateRoom(@MessageBody() data: { userId: string; videoName?: string }, @ConnectedSocket() client: Socket) {
     const roomId = randomBytes(3).toString('hex').toUpperCase(); // 6-char room ID
-    this.roomService.createRoom(roomId, data.userId);
+    this.roomService.createRoom(roomId, data.userId, data.videoName);
     client.join(roomId);
-    client.emit('roomCreated', { roomId });
+    client.emit('roomCreated', { roomId, videoName: data.videoName });
   }
 
   @SubscribeMessage('joinRoom')
@@ -61,6 +61,14 @@ export class SignalingGateway implements OnGatewayDisconnect {
   handleSeek(@MessageBody() data: { roomId: string; time: number; userId: string }, @ConnectedSocket() client: Socket) {
     // Broadcast to all users in the room except the sender
     client.to(data.roomId).emit('seek', { time: data.time, userId: data.userId });
+  }
+
+  @SubscribeMessage('getVideoName')
+  handleGetVideoName(@MessageBody() data: { roomId: string }, @ConnectedSocket() client: Socket) {
+    const videoName = this.roomService.getVideoName(data.roomId);
+    if (videoName) {
+      client.emit('videoName', { videoName });
+    }
   }
 
   handleDisconnect(client: Socket) {

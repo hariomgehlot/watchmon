@@ -8,8 +8,8 @@ import { SocketProvider } from './socket-provider';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'StreamSync - Watch Together',
-  description: 'Watch videos together in perfect sync with your friends',
+  title: 'watchmon - Watch Monster',
+  description: 'Watch videos together',
 };
 
 export default function RootLayout({

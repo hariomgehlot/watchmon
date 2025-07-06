@@ -180,188 +180,195 @@ export const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
     };
 
     return (
-      <Card className="glass-card border-purple-500/20 overflow-hidden rounded-3xl">
-        <div
-          ref={containerRef}
-          className="relative group"
-          onMouseEnter={() => setShowControls(true)}
-          onMouseLeave={() => setShowControls(false)}
-        >
-          <video
-            ref={videoRef}
-            className="w-full aspect-video bg-black"
-            onPlay={() => {
-              setIsPlaying(true);
-              if (onPlay) onPlay();
-            }}
-            onPause={() => {
-              setIsPlaying(false);
-              if (onPause) onPause();
-            }}
-            autoPlay
-            muted={isMutedLocal}
-          />
-          {/* Clickable Overlay */}
-          <div 
-            className="absolute inset-0 cursor-pointer"
-            onClick={handleOverlayClick}
-          />
+      <>
+        <div className="px-2 pt-4 pb-1 sm:px-6 sm:pt-6 sm:pb-2">
+          <h2 className="text-lg sm:text-2xl font-bold text-center text-muted-foreground drop-shadow-md">
+            {title}
+          </h2>
+        </div>
+        <Card className="glass-card border-purple-500/20 overflow-hidden rounded-2xl sm:rounded-3xl">
+          <div
+            ref={containerRef}
+            className="relative group"
+            onMouseEnter={() => setShowControls(true)}
+            onMouseLeave={() => setShowControls(false)}
+          >
+            <video
+              ref={videoRef}
+              className="w-full aspect-video bg-black"
+              onPlay={() => {
+                setIsPlaying(true);
+                if (onPlay) onPlay();
+              }}
+              onPause={() => {
+                setIsPlaying(false);
+                if (onPause) onPause();
+              }}
+              autoPlay
+              muted={isMutedLocal}
+            />
+            {/* Clickable Overlay */}
+            <div 
+              className="absolute inset-0 cursor-pointer"
+              onClick={handleOverlayClick}
+            />
 
-          {/* Play/Pause Overlay with Skip Buttons - Only show when paused */}
-          {!isPlaying && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/20 pointer-events-none">
-              <div className="flex items-center gap-8 pointer-events-auto">
-                {/* Skip Backward Button */}
-                <Button
-                  onClick={skipBack}
-                  size="icon"
-                  className="w-16 h-16 bg-white/10 hover:bg-white/20 border-2 border-white/30 rounded-full backdrop-blur-sm transition-all duration-300 hover:scale-110"
-                >
-                  <SkipBack className="w-6 h-6 text-white" />
-                </Button>
-                {/* Main Play Button with Animation */}
-                <div 
-                  className="w-20 h-20 bg-white/10 hover:bg-white/20 border-2 border-white/30 rounded-full backdrop-blur-sm flex items-center justify-center cursor-pointer transition-all duration-300 hover:scale-110 group/play"
-                  onClick={togglePlay}
-                >
-                  <div className="relative w-8 h-8 flex items-center justify-center">
-                    {/* Play Icon */}
-                    <div className={`absolute inset-0 flex items-center justify-center transition-all duration-500 ease-in-out ${
-                      !isPlaying ? 'opacity-100 scale-100 rotate-0' : 'opacity-0 scale-75 rotate-90'
-                    }`}>
-                      <Play className="w-8 h-8 text-white ml-1" />
-                    </div>
-                    {/* Pause Icon */}
-                    <div className={`absolute inset-0 flex items-center justify-center transition-all duration-500 ease-in-out ${
-                      isPlaying ? 'opacity-100 scale-100 rotate-0' : 'opacity-0 scale-75 -rotate-90'
-                    }`}>
-                      <Pause className="w-8 h-8 text-white" />
+            {/* Play/Pause Overlay with Skip Buttons - Only show when paused */}
+            {!isPlaying && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/20 pointer-events-none">
+                <div className="flex items-center gap-8 pointer-events-auto">
+                  {/* Skip Backward Button */}
+                  <Button
+                    onClick={skipBack}
+                    size="icon"
+                    className="w-16 h-16 bg-white/10 hover:bg-white/20 border-2 border-white/30 rounded-full backdrop-blur-sm transition-all duration-300 hover:scale-110"
+                  >
+                    <SkipBack className="w-6 h-6 text-white" />
+                  </Button>
+                  {/* Main Play Button with Animation */}
+                  <div 
+                    className="w-20 h-20 bg-white/10 hover:bg-white/20 border-2 border-white/30 rounded-full backdrop-blur-sm flex items-center justify-center cursor-pointer transition-all duration-300 hover:scale-110 group/play"
+                    onClick={togglePlay}
+                  >
+                    <div className="relative w-8 h-8 flex items-center justify-center">
+                      {/* Play Icon */}
+                      <div className={`absolute inset-0 flex items-center justify-center transition-all duration-500 ease-in-out ${
+                        !isPlaying ? 'opacity-100 scale-100 rotate-0' : 'opacity-0 scale-75 rotate-90'
+                      }`}>
+                        <Play className="w-8 h-8 text-white ml-1" />
+                      </div>
+                      {/* Pause Icon */}
+                      <div className={`absolute inset-0 flex items-center justify-center transition-all duration-500 ease-in-out ${
+                        isPlaying ? 'opacity-100 scale-100 rotate-0' : 'opacity-0 scale-75 -rotate-90'
+                      }`}>
+                        <Pause className="w-8 h-8 text-white" />
+                      </div>
                     </div>
                   </div>
+                  {/* Skip Forward Button */}
+                  <Button
+                    onClick={skipForward}
+                    size="icon"
+                    className="w-16 h-16 bg-white/10 hover:bg-white/20 border-2 border-white/30 rounded-full backdrop-blur-sm transition-all duration-300 hover:scale-110"
+                  >
+                    <SkipForward className="w-6 h-6 text-white" />
+                  </Button>
                 </div>
-                {/* Skip Forward Button */}
-                <Button
-                  onClick={skipForward}
-                  size="icon"
-                  className="w-16 h-16 bg-white/10 hover:bg-white/20 border-2 border-white/30 rounded-full backdrop-blur-sm transition-all duration-300 hover:scale-110"
-                >
-                  <SkipForward className="w-6 h-6 text-white" />
-                </Button>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Controls - Only show on hover */}
-          {showControls && (
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300 pointer-events-none opacity-100">
-              <div className="p-4 space-y-4 pointer-events-auto">
-                {/* Progress Bar */}
-                <div className="flex items-center gap-2 text-white text-sm">
-                  <span>{formatTime(currentTime)}</span>
-                  <Slider
-                    value={[currentTime]}
-                    max={duration}
-                    step={1}
-                    onValueChange={handleTimeChange}
-                    className="flex-1"
-                  />
-                  <span>{formatTime(duration)}</span>
-                </div>
-                {/* Control Buttons */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Button
-                      onClick={skipBack}
-                      size="icon"
-                      variant="ghost"
-                      className="text-white hover:bg-white/10 transition-all duration-200"
-                    >
-                      <SkipBack className="w-5 h-5" />
-                    </Button>
-                    <Button
-                      onClick={togglePlay}
-                      size="icon"
-                      variant="ghost"
-                      className="text-white hover:bg-white/10 transition-all duration-200"
-                    >
-                      <div className="relative w-5 h-5 flex items-center justify-center">
-                        {/* Play Icon */}
-                        <div className={`absolute inset-0 flex items-center justify-center transition-all duration-300 ease-in-out ${
-                          !isPlaying ? 'opacity-100 scale-100' : 'opacity-0 scale-75'
-                        }`}>
-                          <Play className="w-5 h-5" />
+            {/* Controls - Only show on hover */}
+            {showControls && (
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300 pointer-events-none opacity-100">
+                <div className="p-4 space-y-4 pointer-events-auto">
+                  {/* Progress Bar */}
+                  <div className="flex items-center gap-2 text-white text-sm">
+                    <span>{formatTime(currentTime)}</span>
+                    <Slider
+                      value={[currentTime]}
+                      max={duration}
+                      step={1}
+                      onValueChange={handleTimeChange}
+                      className="flex-1"
+                    />
+                    <span>{formatTime(duration)}</span>
+                  </div>
+                  {/* Control Buttons */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={skipBack}
+                        size="icon"
+                        variant="ghost"
+                        className="text-white hover:bg-white/10 transition-all duration-200"
+                      >
+                        <SkipBack className="w-5 h-5" />
+                      </Button>
+                      <Button
+                        onClick={togglePlay}
+                        size="icon"
+                        variant="ghost"
+                        className="text-white hover:bg-white/10 transition-all duration-200"
+                      >
+                        <div className="relative w-5 h-5 flex items-center justify-center">
+                          {/* Play Icon */}
+                          <div className={`absolute inset-0 flex items-center justify-center transition-all duration-300 ease-in-out ${
+                            !isPlaying ? 'opacity-100 scale-100' : 'opacity-0 scale-75'
+                          }`}>
+                            <Play className="w-5 h-5" />
+                          </div>
+                          {/* Pause Icon */}
+                          <div className={`absolute inset-0 flex items-center justify-center transition-all duration-300 ease-in-out ${
+                            isPlaying ? 'opacity-100 scale-100' : 'opacity-0 scale-75'
+                          }`}>
+                            <Pause className="w-5 h-5" />
+                          </div>
                         </div>
-                        {/* Pause Icon */}
-                        <div className={`absolute inset-0 flex items-center justify-center transition-all duration-300 ease-in-out ${
-                          isPlaying ? 'opacity-100 scale-100' : 'opacity-0 scale-75'
-                        }`}>
-                          <Pause className="w-5 h-5" />
+                      </Button>
+                      <Button
+                        onClick={skipForward}
+                        size="icon"
+                        variant="ghost"
+                        className="text-white hover:bg-white/10 transition-all duration-200"
+                      >
+                        <SkipForward className="w-5 h-5" />
+                      </Button>
+                      {/* Volume controls */}
+                      <div className="flex items-center gap-2 ml-4">
+                        <Button
+                          onClick={toggleMute}
+                          size="icon"
+                          variant="ghost"
+                          className="text-white hover:bg-white/10"
+                        >
+                          {isMutedLocal ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                        </Button>
+                        <div className="w-20">
+                          <Slider
+                            value={[volume]}
+                            max={1}
+                            step={0.1}
+                            onValueChange={handleVolumeChange}
+                            className="w-full"
+                          />
                         </div>
                       </div>
-                    </Button>
-                    <Button
-                      onClick={skipForward}
-                      size="icon"
-                      variant="ghost"
-                      className="text-white hover:bg-white/10 transition-all duration-200"
-                    >
-                      <SkipForward className="w-5 h-5" />
-                    </Button>
-                    {/* Volume controls */}
-                    <div className="flex items-center gap-2 ml-4">
+                    </div>
+                    <div className="flex items-center gap-2">
                       <Button
-                        onClick={toggleMute}
                         size="icon"
                         variant="ghost"
                         className="text-white hover:bg-white/10"
                       >
-                        {isMutedLocal ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                        <Settings className="w-5 h-5" />
                       </Button>
-                      <div className="w-20">
-                        <Slider
-                          value={[volume]}
-                          max={1}
-                          step={0.1}
-                          onValueChange={handleVolumeChange}
-                          className="w-full"
-                        />
-                      </div>
+                      <Button
+                        onClick={toggleFullscreen}
+                        size="icon"
+                        variant="ghost"
+                        className="text-white hover:bg-white/10"
+                      >
+                        <Maximize className="w-5 h-5" />
+                      </Button>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="text-white hover:bg-white/10"
-                    >
-                      <Settings className="w-5 h-5" />
-                    </Button>
-                    <Button
-                      onClick={toggleFullscreen}
-                      size="icon"
-                      variant="ghost"
-                      className="text-white hover:bg-white/10"
-                    >
-                      <Maximize className="w-5 h-5" />
-                    </Button>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Host/Viewer Badge */}
-          <div className="absolute top-4 right-4 pointer-events-none">
-            <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-              isHost 
-                ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' 
-                : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-            }`}>
-              {isHost ? 'Host' : 'Viewer'}
+            {/* Host/Viewer Badge */}
+            <div className="absolute top-4 right-4 pointer-events-none">
+              <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                isHost 
+                  ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' 
+                  : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+              }`}>
+                {isHost ? 'Host' : 'Viewer'}
+              </div>
             </div>
           </div>
-        </div>
-      </Card>
+        </Card>
+      </>
     );
   }
 );

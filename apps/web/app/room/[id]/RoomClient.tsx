@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, useContext } from 'react';
-import { ArrowLeft, Users, Share2, Volume2, VolumeX } from 'lucide-react';
+import { Users, Share2, Volume2, VolumeX, LogOut } from 'lucide-react';
 import { Button } from '@repo/ui/button';
 import { Card, CardContent } from '@repo/ui/card';
 import { Badge } from '@repo/ui/badge';
@@ -26,18 +26,26 @@ function RoomClientImpl({ roomId }: { roomId: string }) {
   const [hostId, setHostId] = useState<string | null>(null);
   const hostIdRef = useRef<string | null>(null);
   const pendingCandidates = useRef<any[]>([]);
-  const [isPlaying, setIsPlaying] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [videoName, setVideoName] = useState<string | null>(null);
 
   // WebRTC: Handle incoming offer, ICE, and send answer
   useEffect(() => {
     if (!socket || !userId) return;
     // Join the room
     socket.emit('joinRoom', { roomId, userId });
+    // Request video name from host/server
+    socket.emit('getVideoName', { roomId });
     // Listen for hostId (first user in room)
     socket.on('userJoined', ({ userId: host }: { userId: string }) => {
       if (host !== userId) setHostId(host);
     });
+    // Listen for videoName event
+    const onVideoName = ({ videoName }: { videoName: string }) => {
+      setVideoName(videoName);
+    };
+    socket.on('videoName', onVideoName);
     // Handle signaling
     const onSignal = async ({ from, signal }: { from: string; signal: any }) => {
       console.log('[VIEWER] Received signal from', from, signal);
@@ -55,6 +63,7 @@ function RoomClientImpl({ roomId }: { roomId: string }) {
         peer.ontrack = (e) => {
           console.log('[VIEWER] Received remote track', e.streams[0]);
           setMediaStream(e.streams[0] || null);
+          setIsPlaying(false);
         };
         // Send ICE candidates
         peer.onicecandidate = (e) => {
@@ -93,6 +102,7 @@ function RoomClientImpl({ roomId }: { roomId: string }) {
     return () => {
       socket.off('signal', onSignal);
       socket.off('userJoined');
+      socket.off('videoName', onVideoName);
     };
   }, [socket, userId, roomId, hostId]);
 
@@ -222,12 +232,11 @@ function RoomClientImpl({ roomId }: { roomId: string }) {
                 variant="ghost"
                 className="text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
               >
-                <ArrowLeft className="w-5 h-5 mr-2" />
-                Leave Room
+                <LogOut className="w-5 h-5" />
+                Leave
               </Button>
               <div>
-                <h1 className="text-xl font-bold text-purple-400">Room {roomId}</h1>
-                <p className="text-sm text-muted-foreground">{roomData.title}</p>
+                <h1 className="text-xl font-bold text-purple-400">Theater {roomId}</h1>
               </div>
             </div>
             <div className="flex items-center gap-4">
@@ -263,7 +272,7 @@ function RoomClientImpl({ roomId }: { roomId: string }) {
           <VideoPlayer
             ref={videoRef}
             mediaStream={mediaStream}
-            title={roomData?.title || ''}
+            title={videoName || roomData?.title || ''}
             isHost={roomData?.isHost}
             isMuted={isMuted}
             onPlay={() => handlePlayPause('play')}
