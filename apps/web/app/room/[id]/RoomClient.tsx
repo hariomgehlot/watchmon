@@ -24,6 +24,10 @@ function RoomClientImpl({ roomId }: { roomId: string }) {
   const socket = useSocket();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [hostId, setHostId] = useState<string | null>(null);
+  const hostIdRef = useRef<string | null>(null);
+  const pendingCandidates = useRef<any[]>([]);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [notFound, setNotFound] = useState(false);
 
   // WebRTC: Handle incoming offer, ICE, and send answer
   useEffect(() => {
@@ -37,39 +41,51 @@ function RoomClientImpl({ roomId }: { roomId: string }) {
     // Handle signaling
     const onSignal = async ({ from, signal }: { from: string; signal: any }) => {
       console.log('[VIEWER] Received signal from', from, signal);
-      if (!peerRef.current) {
-        // Only create peer on offer
-        if (signal.type === 'offer') {
-          setHostId(from);
-          const peer = new RTCPeerConnection();
-          peerRef.current = peer;
-          // Handle remote stream
-          peer.ontrack = (e) => {
-            console.log('[VIEWER] Received remote track', e.streams[0]);
-            setMediaStream(e.streams[0] || null);
-          };
-          // Send ICE candidates
-          peer.onicecandidate = (e) => {
-            if (e.candidate && hostId) {
-              console.log('[VIEWER] Sending ICE candidate to', hostId, e.candidate);
-              socket.emit('signal', { roomId, from: userId, to: hostId, signal: { candidate: e.candidate } });
-            }
-          };
-          await peer.setRemoteDescription(new RTCSessionDescription(signal));
-          console.log('[VIEWER] Set remote description (offer)', peer.remoteDescription);
-          const answer = await peer.createAnswer();
-          console.log('[VIEWER] Created answer', answer);
-          await peer.setLocalDescription(answer);
-          console.log('[VIEWER] Set local description (answer)', peer.localDescription);
-          socket.emit('signal', { roomId, from: userId, to: from, signal: answer });
+      if (signal.type === 'offer') {
+        // Always close and replace the peer connection on new offer
+        if (peerRef.current) {
+          peerRef.current.close();
+          peerRef.current = null;
         }
-      } else {
-        // Handle ICE
-        if (signal.candidate) {
+        setHostId(from);
+        hostIdRef.current = from;
+        const peer = new RTCPeerConnection();
+        peerRef.current = peer;
+        // Handle remote stream
+        peer.ontrack = (e) => {
+          console.log('[VIEWER] Received remote track', e.streams[0]);
+          setMediaStream(e.streams[0] || null);
+        };
+        // Send ICE candidates
+        peer.onicecandidate = (e) => {
+          if (e.candidate && hostIdRef.current) {
+            console.log('[VIEWER] Sending ICE candidate to', hostIdRef.current, e.candidate);
+            socket.emit('signal', { roomId, from: userId, to: hostIdRef.current, signal: { candidate: e.candidate } });
+          }
+        };
+        await peer.setRemoteDescription(new RTCSessionDescription(signal));
+        console.log('[VIEWER] Set remote description (offer)', peer.remoteDescription);
+        const answer = await peer.createAnswer();
+        console.log('[VIEWER] Created answer', answer);
+        await peer.setLocalDescription(answer);
+        console.log('[VIEWER] Set local description (answer)', peer.localDescription);
+        socket.emit('signal', { roomId, from: userId, to: from, signal: answer });
+        // Add any pending ICE candidates
+        pendingCandidates.current.forEach(candidate => {
+          peer.addIceCandidate(new RTCIceCandidate(candidate)).then(() => {
+            console.log('[VIEWER] Added buffered ICE candidate');
+          });
+        });
+        pendingCandidates.current = [];
+      } else if (signal.candidate) {
+        if (peerRef.current) {
           console.log('[VIEWER] Received ICE candidate from', from, signal.candidate);
           peerRef.current.addIceCandidate(new RTCIceCandidate(signal.candidate)).then(() => {
             console.log('[VIEWER] Added ICE candidate from', from);
           });
+        } else {
+          // Buffer ICE candidates until peer connection is ready
+          pendingCandidates.current.push(signal.candidate);
         }
       }
     };
@@ -106,6 +122,80 @@ function RoomClientImpl({ roomId }: { roomId: string }) {
   const toggleMute = () => {
     setIsMuted(!isMuted);
   };
+
+  // Listen for playPause events from the server
+  useEffect(() => {
+    if (!socket) return;
+    const onPlayPause = ({ action }: { action: 'play' | 'pause'; userId: string }) => {
+      if (videoRef.current) {
+        if (action === 'play') {
+          videoRef.current.play();
+          setIsPlaying(true);
+        } else if (action === 'pause') {
+          videoRef.current.pause();
+          setIsPlaying(false);
+        }
+      }
+    };
+    socket.on('playPause', onPlayPause);
+    return () => {
+      socket.off('playPause', onPlayPause);
+    };
+  }, [socket]);
+
+  // Emit playPause when user interacts
+  const handlePlayPause = (action: 'play' | 'pause') => {
+    if (socket && userId) {
+      socket.emit('playPause', { roomId, action, userId });
+    }
+    setIsPlaying(action === 'play');
+  };
+
+  // Listen for seek events from the server
+  useEffect(() => {
+    if (!socket) return;
+    const onSeek = ({ time }: { time: number; userId: string }) => {
+      if (videoRef.current) {
+        videoRef.current.currentTime = time;
+      }
+    };
+    socket.on('seek', onSeek);
+    return () => {
+      socket.off('seek', onSeek);
+    };
+  }, [socket]);
+
+  // Emit seek when user interacts
+  const handleSeek = (time: number) => {
+    if (socket && userId) {
+      socket.emit('seek', { roomId, time, userId });
+    }
+    if (videoRef.current) {
+      videoRef.current.currentTime = time;
+    }
+  };
+
+  // Timeout to detect if no stream is received (room not found or not playing)
+  useEffect(() => {
+    if (mediaStream) return;
+    const timeout = setTimeout(() => {
+      if (!mediaStream) setNotFound(true);
+    }, 3000);
+    return () => clearTimeout(timeout);
+  }, [mediaStream]);
+
+  if (notFound) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-purple-950/20 flex items-center justify-center">
+        <Card className="glass-card border-purple-500/20">
+          <CardContent className="p-8 text-center space-y-6">
+            <p className="text-purple-400 text-lg font-semibold">Nothing is playing in this room.</p>
+            <Button onClick={() => router.push('/')} className="bg-gradient-to-r from-purple-500 to-pink-500 text-white w-full">Go back home</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (!isConnected || !roomData) {
     return (
@@ -176,6 +266,10 @@ function RoomClientImpl({ roomId }: { roomId: string }) {
             title={roomData?.title || ''}
             isHost={roomData?.isHost}
             isMuted={isMuted}
+            onPlay={() => handlePlayPause('play')}
+            onPause={() => handlePlayPause('pause')}
+            isPlaying={isPlaying}
+            onSeek={handleSeek}
           />
         </div>
       </div>

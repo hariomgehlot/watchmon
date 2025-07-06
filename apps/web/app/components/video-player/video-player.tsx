@@ -12,10 +12,22 @@ interface VideoPlayerProps {
   title: string;
   isHost?: boolean;
   isMuted?: boolean;
+  onPlay?: () => void;
+  onPause?: () => void;
+  isPlaying?: boolean;
+  onSeek?: (time: number) => void;
+}
+
+// Helper to detect mobile devices
+function isMobileDevice() {
+  return (
+    typeof window !== 'undefined' &&
+    /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+  );
 }
 
 export const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
-  ({ fileUrl, mediaStream, title, isHost = false, isMuted = false }, ref) => {
+  ({ fileUrl, mediaStream, title, isHost = false, isMuted = false, onPlay, onPause, isPlaying: isPlayingProp, onSeek }, ref) => {
     const innerVideoRef = useRef<HTMLVideoElement>(null);
     const videoRef = (ref as React.RefObject<HTMLVideoElement>) || innerVideoRef;
     const [isPlaying, setIsPlaying] = useState(false);
@@ -26,6 +38,13 @@ export const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
     const [showControls, setShowControls] = useState(true);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
+
+    // Sync isPlaying state with prop if provided
+    useEffect(() => {
+      if (typeof isPlayingProp === 'boolean') {
+        setIsPlaying(isPlayingProp);
+      }
+    }, [isPlayingProp]);
 
     // Set video source based on fileUrl or mediaStream
     useEffect(() => {
@@ -43,7 +62,7 @@ export const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
 
     useEffect(() => {
       if (videoRef.current) {
-        videoRef.current.muted = !isHost || isMutedLocal;
+        videoRef.current.muted = isMutedLocal;
       }
     }, [isMutedLocal, isMuted, isHost]);
 
@@ -66,12 +85,37 @@ export const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
       };
     }, []);
 
+    // Handle orientation lock/unlock on fullscreen change
+    useEffect(() => {
+      function handleFullscreenChange() {
+        const isNowFullscreen = !!document.fullscreenElement;
+        setIsFullscreen(isNowFullscreen);
+        if (isNowFullscreen) {
+          // Entering fullscreen
+          if (isMobileDevice() && screen.orientation && typeof (screen.orientation as any).lock === 'function') {
+            (screen.orientation as any).lock('landscape').catch(() => {});
+          }
+        } else {
+          // Exiting fullscreen
+          if (isMobileDevice() && screen.orientation && typeof (screen.orientation as any).unlock === 'function') {
+            (screen.orientation as any).unlock();
+          }
+        }
+      }
+      document.addEventListener('fullscreenchange', handleFullscreenChange);
+      return () => {
+        document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      };
+    }, []);
+
     const togglePlay = () => {
       if (videoRef.current) {
         if (isPlaying) {
           videoRef.current.pause();
+          if (onPause) onPause();
         } else {
           videoRef.current.play();
+          if (onPlay) onPlay();
         }
         setIsPlaying(!isPlaying);
       }
@@ -95,27 +139,30 @@ export const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
       if (videoRef.current) {
         videoRef.current.currentTime = newTime;
       }
+      if (onSeek) onSeek(newTime);
     };
 
     const skipBack = () => {
       if (videoRef.current) {
         videoRef.current.currentTime = Math.max(0, (videoRef.current.currentTime ?? 0) - 10);
+        if (onSeek) onSeek(videoRef.current.currentTime);
       }
     };
 
     const skipForward = () => {
       if (videoRef.current) {
         videoRef.current.currentTime = Math.min(duration ?? 0, (videoRef.current.currentTime ?? 0) + 10);
+        if (onSeek) onSeek(videoRef.current.currentTime);
       }
     };
 
     const toggleFullscreen = () => {
       if (!document.fullscreenElement) {
         containerRef.current?.requestFullscreen();
-        setIsFullscreen(true);
+        // Orientation lock will be handled by fullscreenchange event
       } else {
         document.exitFullscreen();
-        setIsFullscreen(false);
+        // Orientation unlock will be handled by fullscreenchange event
       }
     };
 
@@ -133,7 +180,7 @@ export const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
     };
 
     return (
-      <Card className="glass-card border-purple-500/20 overflow-hidden">
+      <Card className="glass-card border-purple-500/20 overflow-hidden rounded-3xl">
         <div
           ref={containerRef}
           className="relative group"
@@ -143,10 +190,16 @@ export const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
           <video
             ref={videoRef}
             className="w-full aspect-video bg-black"
-            onPlay={() => setIsPlaying(true)}
-            onPause={() => setIsPlaying(false)}
+            onPlay={() => {
+              setIsPlaying(true);
+              if (onPlay) onPlay();
+            }}
+            onPause={() => {
+              setIsPlaying(false);
+              if (onPause) onPause();
+            }}
             autoPlay
-            muted={!isHost || isMutedLocal}
+            muted={isMutedLocal}
           />
           {/* Clickable Overlay */}
           <div 

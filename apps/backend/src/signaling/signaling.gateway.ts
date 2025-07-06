@@ -1,10 +1,10 @@
-import { WebSocketGateway, WebSocketServer, SubscribeMessage, MessageBody, ConnectedSocket } from '@nestjs/websockets';
+import { WebSocketGateway, WebSocketServer, SubscribeMessage, MessageBody, ConnectedSocket, OnGatewayDisconnect } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { RoomService } from '../room/room.service';
 import { randomBytes } from 'crypto';
 
 @WebSocketGateway({ cors: true })
-export class SignalingGateway {
+export class SignalingGateway implements OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
@@ -49,5 +49,25 @@ export class SignalingGateway {
   handleSync(@MessageBody() data: { roomId: string; currentTime: number }, @ConnectedSocket() client: Socket) {
     this.roomTimes[data.roomId] = data.currentTime;
     client.to(data.roomId).emit('sync', { currentTime: data.currentTime });
+  }
+
+  @SubscribeMessage('playPause')
+  handlePlayPause(@MessageBody() data: { roomId: string; action: 'play' | 'pause'; userId: string }, @ConnectedSocket() client: Socket) {
+    // Broadcast to all users in the room except the sender
+    client.to(data.roomId).emit('playPause', { action: data.action, userId: data.userId });
+  }
+
+  @SubscribeMessage('seek')
+  handleSeek(@MessageBody() data: { roomId: string; time: number; userId: string }, @ConnectedSocket() client: Socket) {
+    // Broadcast to all users in the room except the sender
+    client.to(data.roomId).emit('seek', { time: data.time, userId: data.userId });
+  }
+
+  handleDisconnect(client: Socket) {
+    // Find userId by socketId
+    const userId = Array.from(this.roomService.userSockets.entries()).find(([, socketId]) => socketId === client.id)?.[0];
+    if (userId) {
+      this.roomService.removeUser(userId);
+    }
   }
 } 

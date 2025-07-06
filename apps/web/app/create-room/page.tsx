@@ -1,26 +1,25 @@
-'use client';
-import { useState, useEffect, useRef, useContext } from 'react';
-import { ArrowLeft, Upload } from 'lucide-react';
-import { Button } from '@repo/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/card';
-import { Input } from '@repo/ui/input';
-import { Label } from '@repo/ui/label';
-import { useRouter } from 'next/navigation';
-import { VideoPlayer } from '../components/video-player/video-player';
-import { UserIdProvider, UserIdContext } from '../user-id-provider';
-import { useSocket } from '../socket-provider';
+"use client";
+import { useState, useEffect, useRef, useContext } from "react";
+import { ArrowLeft, Upload } from "lucide-react";
+import { Button } from "@repo/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/card";
+import { Input } from "@repo/ui/input";
+import { Label } from "@repo/ui/label";
+import { useRouter } from "next/navigation";
+import { VideoPlayer } from "../components/video-player/video-player";
+import { UserIdProvider, UserIdContext } from "../user-id-provider";
+import { useSocket } from "../socket-provider";
 
 function CreateRoomImpl() {
-
   const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
-  const [videoUrl, setVideoUrl] = useState<string>('');
-  const [roomId, setRoomId] = useState<string>('');
+  const [videoUrl, setVideoUrl] = useState<string>("");
+  const [roomId, setRoomId] = useState<string>("");
   const [isCreating, setIsCreating] = useState(false);
-  const [step, setStep] = useState<'upload' | 'preview' | 'created'>('upload');
+  const [step, setStep] = useState<"upload" | "preview" | "created">("upload");
   const [joined, setJoined] = useState(false);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
   const [recorderStarted, setRecorderStarted] = useState(false);
-  const [playbackUrl, setPlaybackUrl] = useState<string>('');
+  const [playbackUrl, setPlaybackUrl] = useState<string>("");
   const [isStarting, setIsStarting] = useState(false);
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -43,31 +42,48 @@ function CreateRoomImpl() {
   useEffect(() => {
     if (!socket || !userId || !mediaStream) return;
     const onViewerJoined = async ({ viewerId }: { viewerId: string }) => {
-      if (peerConnections.current[viewerId]) return; // Already connected
+      if (peerConnections.current[viewerId]) {
+        peerConnections.current[viewerId].close();
+        delete peerConnections.current[viewerId];
+      }
       const peer = new RTCPeerConnection();
       peerConnections.current[viewerId] = peer;
       // Add all tracks
       mediaStream.getTracks().forEach((track: MediaStreamTrack) => {
-        console.log('[HOST] Adding track to peer', viewerId, track);
+        console.log("[HOST] Adding track to peer", viewerId, track);
         peer.addTrack(track, mediaStream);
       });
       // Send ICE candidates
       peer.onicecandidate = (e) => {
         if (e.candidate) {
-          console.log('[HOST] Sending ICE candidate to', viewerId, e.candidate);
-          socket.emit('signal', { roomId, from: userId, to: viewerId, signal: { candidate: e.candidate } });
+          console.log("[HOST] Sending ICE candidate to", viewerId, e.candidate);
+          socket.emit("signal", {
+            roomId,
+            from: userId,
+            to: viewerId,
+            signal: { candidate: e.candidate },
+          });
         }
       };
       // Create offer and send to viewer
       const offer = await peer.createOffer();
-      console.log('[HOST] Created offer for', viewerId, offer);
+      console.log("[HOST] Created offer for", viewerId, offer);
       await peer.setLocalDescription(offer);
-      console.log('[HOST] Set local description for', viewerId, peer.localDescription);
-      socket.emit('signal', { roomId, from: userId, to: viewerId, signal: offer });
+      console.log(
+        "[HOST] Set local description for",
+        viewerId,
+        peer.localDescription
+      );
+      socket.emit("signal", {
+        roomId,
+        from: userId,
+        to: viewerId,
+        signal: offer,
+      });
     };
-    socket.on('viewerJoined', onViewerJoined);
+    socket.on("viewerJoined", onViewerJoined);
     return () => {
-      socket.off('viewerJoined', onViewerJoined);
+      socket.off("viewerJoined", onViewerJoined);
     };
   }, [socket, userId, mediaStream, roomId]);
 
@@ -77,21 +93,31 @@ function CreateRoomImpl() {
     const onSignal = ({ from, signal }: { from: string; signal: any }) => {
       const peer = peerConnections.current[from];
       if (!peer) return;
-      if (signal.type === 'answer') {
-        console.log('[HOST] Received answer from', from, signal);
-        peer.setRemoteDescription(new RTCSessionDescription(signal)).then(() => {
-          console.log('[HOST] Set remote description (answer) for', from, peer.remoteDescription);
-        });
+      if (signal.type === "answer") {
+        console.log("[HOST] Received answer from", from, signal);
+        peer
+          .setRemoteDescription(new RTCSessionDescription(signal))
+          .then(() => {
+            console.log(
+              "[HOST] Set remote description (answer) for",
+              from,
+              peer.remoteDescription
+            );
+          });
       } else if (signal.candidate) {
-        console.log('[HOST] Received ICE candidate from', from, signal.candidate);
+        console.log(
+          "[HOST] Received ICE candidate from",
+          from,
+          signal.candidate
+        );
         peer.addIceCandidate(new RTCIceCandidate(signal.candidate)).then(() => {
-          console.log('[HOST] Added ICE candidate from', from);
+          console.log("[HOST] Added ICE candidate from", from);
         });
       }
     };
-    socket.on('signal', onSignal);
+    socket.on("signal", onSignal);
     return () => {
-      socket.off('signal', onSignal);
+      socket.off("signal", onSignal);
     };
   }, [socket, userId]);
 
@@ -100,27 +126,28 @@ function CreateRoomImpl() {
     if (!socket) return;
     const onRoomCreated = ({ roomId }: { roomId: string }) => {
       setRoomId(roomId);
-      socket.emit('joinRoom', { roomId, userId });
+      socket.emit("joinRoom", { roomId, userId });
       setJoined(true);
       setIsCreating(false);
       setIsStarting(false);
-      setStep('created');
+      setStep("created");
     };
-    socket.on('roomCreated', onRoomCreated);
+    socket.on("roomCreated", onRoomCreated);
     return () => {
-      socket.off('roomCreated', onRoomCreated);
+      socket.off("roomCreated", onRoomCreated);
     };
   }, [socket, userId]);
 
   // Capture the video stream for WebRTC after room is created and video is ready
   useEffect(() => {
     if (
-      step !== 'created' ||
+      step !== "created" ||
       !joined ||
       !videoRef.current ||
       !selectedVideo ||
       mediaStream // Only capture once
-    ) return;
+    )
+      return;
 
     // Wait for video to be ready
     const handleReady = () => {
@@ -131,28 +158,56 @@ function CreateRoomImpl() {
     if (videoRef.current.readyState >= 2) {
       handleReady();
     } else {
-      videoRef.current.addEventListener('loadedmetadata', handleReady, { once: true });
+      videoRef.current.addEventListener("loadedmetadata", handleReady, {
+        once: true,
+      });
       return () => {
-        videoRef.current?.removeEventListener('loadedmetadata', handleReady);
+        videoRef.current?.removeEventListener("loadedmetadata", handleReady);
       };
     }
   }, [step, joined, selectedVideo, mediaStream]);
 
+  // Listen for playPause events from the server (to sync host video with viewers)
+  useEffect(() => {
+    const onPlayPause = ({
+      action,
+    }: {
+      action: "play" | "pause";
+      userId: string;
+    }) => {
+      if (!videoRef.current) return;
+      if (action === "play") {
+        videoRef.current.play();
+      } else if (action === "pause") {
+        videoRef.current.pause();
+      }
+    };
+    socket.on("playPause", onPlayPause);
+    return () => {
+      socket.off("playPause", onPlayPause);
+    };
+  }, [socket]);
+  const handlePlay = () => {
+    socket.emit("playPause", { roomId, action: "play", userId });
+  };
+  const handlePause = () => {
+    socket.emit("playPause", { roomId, action: "pause", userId });
+  };
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
     setSelectedVideo(f);
     setVideoUrl(URL.createObjectURL(f));
-    setStep('preview');
+    setStep("preview");
   };
 
   const handleBack = () => {
-    if (step === 'preview') {
-      setStep('upload');
+    if (step === "preview") {
+      setStep("upload");
       setSelectedVideo(null);
-      setVideoUrl('');
+      setVideoUrl("");
     } else {
-      router.push('/');
+      router.push("/");
     }
   };
 
@@ -161,7 +216,7 @@ function CreateRoomImpl() {
     if (!userId || !socket || !selectedVideo) return;
     setIsCreating(true);
     setIsStarting(true);
-    socket.emit('createRoom', { userId });
+    socket.emit("createRoom", { userId });
     // roomCreated event will handle the rest
   };
 
@@ -174,7 +229,10 @@ function CreateRoomImpl() {
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-20 left-10 w-72 h-72 bg-purple-500/10 rounded-full blur-3xl animate-pulse-slow"></div>
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse-slow" style={{ animationDelay: '1s' }}></div>
+        <div
+          className="absolute bottom-20 right-10 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse-slow"
+          style={{ animationDelay: "1s" }}
+        ></div>
       </div>
 
       <div className="relative z-10 container mx-auto px-4 py-8">
@@ -192,13 +250,15 @@ function CreateRoomImpl() {
           </h1>
         </div>
 
-        {step === 'upload' && (
+        {step === "upload" && (
           <Card className="glass-card border-purple-500/20 max-w-2xl mx-auto">
             <CardHeader className="text-center">
               <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full mb-4 mx-auto">
                 <Upload className="w-8 h-8 text-white" />
               </div>
-              <CardTitle className="text-2xl font-bold text-purple-400">Upload Video</CardTitle>
+              <CardTitle className="text-2xl font-bold text-purple-400">
+                Upload Video
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <p className="text-center text-muted-foreground">
@@ -220,8 +280,12 @@ function CreateRoomImpl() {
                     <Upload className="w-8 h-8 text-purple-400" />
                   </div>
                   <div>
-                    <p className="text-lg font-medium text-purple-400">Click to upload video</p>
-                    <p className="text-sm text-muted-foreground">Support MP4, AVI, MOV files</p>
+                    <p className="text-lg font-medium text-purple-400">
+                      Click to upload video
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Support MP4, AVI, MOV files
+                    </p>
                   </div>
                 </Label>
               </div>
@@ -229,10 +293,12 @@ function CreateRoomImpl() {
           </Card>
         )}
 
-        {step === 'preview' && selectedVideo && (
+        {step === "preview" && selectedVideo && (
           <Card className="glass-card border-purple-500/20 max-w-2xl mx-auto">
             <CardHeader className="text-center">
-              <CardTitle className="text-2xl font-bold text-purple-400">Preview Video</CardTitle>
+              <CardTitle className="text-2xl font-bold text-purple-400">
+                Preview Video
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               {playbackUrl ? (
@@ -242,32 +308,52 @@ function CreateRoomImpl() {
                   isHost={true}
                   isMuted={false}
                   ref={videoRef}
+                  onPlay={handlePlay}
+                  onPause={handlePause}
                 />
               ) : (
                 <div className="w-full aspect-video bg-black flex items-center justify-center text-gray-400">
                   No video selected
                 </div>
               )}
-              <Button onClick={handleStartWatching} className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white" disabled={isCreating || isStarting}>
-                {isCreating || isStarting ? 'Starting...' : 'Start Watching'}
+              <Button
+                onClick={handleStartWatching}
+                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white"
+                disabled={isCreating || isStarting}
+              >
+                {isCreating || isStarting ? "Starting..." : "Start Watching"}
               </Button>
             </CardContent>
           </Card>
         )}
 
-        {step === 'created' && (
+        {step === "created" && (
           <Card className="glass-card border-purple-500/20 max-w-2xl mx-auto">
             <CardHeader className="text-center">
-              <CardTitle className="text-2xl font-bold text-purple-400">Room Created</CardTitle>
+              <CardTitle className="text-2xl font-bold text-purple-400">
+                Room Created
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <p className="text-center text-muted-foreground">
-                Room ID: <span className="font-mono text-purple-400">{roomId}</span>
+                Room ID:{" "}
+                <span className="font-mono text-purple-400">{roomId}</span>
               </p>
-              <Button onClick={handleJoinCreatedRoom} className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white">
+              <Button
+                onClick={handleJoinCreatedRoom}
+                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white"
+              >
                 Go to Room
               </Button>
-              <VideoPlayer fileUrl={playbackUrl} title="Your Stream" isHost isMuted={false} ref={videoRef} />
+              <VideoPlayer
+                onPlay={handlePlay}
+                onPause={handlePause}
+                fileUrl={playbackUrl}
+                title="Your Stream"
+                isHost
+                isMuted={false}
+                ref={videoRef}
+              />
             </CardContent>
           </Card>
         )}
@@ -280,7 +366,8 @@ export default function CreateRoom(props: any) {
   return (
     <UserIdProvider>
       <CreateRoomImpl /* @next-codemod-error 'props' is used with spread syntax (...). Any asynchronous properties of 'props' must be awaited when accessed. */
-      {...props} />
+        {...props}
+      />
     </UserIdProvider>
   );
 }

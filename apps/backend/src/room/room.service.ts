@@ -9,7 +9,7 @@ interface Room {
 @Injectable()
 export class RoomService {
   private rooms: Map<string, Room> = new Map();
-  private userSockets: Map<string, string> = new Map();
+  public userSockets: Map<string, string> = new Map();
 
   createRoom(roomId: string, userId: string) {
     if (!this.rooms.has(roomId)) {
@@ -39,5 +39,17 @@ export class RoomService {
 
   getSocketId(userId: string): string | undefined {
     return this.userSockets.get(userId);
+  }
+
+  removeUser(userId: string) {
+    // Remove user from all rooms
+    for (const room of this.rooms.values()) {
+      const idx = room.users.indexOf(userId);
+      if (idx !== -1) {
+        room.users.splice(idx, 1);
+      }
+    }
+    // Remove socket mapping
+    this.userSockets.delete(userId);
   }
 } 
