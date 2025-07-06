@@ -7,9 +7,11 @@
     "dev:web": "turbo run dev --filter=web",
     "dev:api": "turbo run dev --filter=backend",
     "lint": "turbo run lint",
+    "start:api": "turbo run start --filter=backend",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
     "clean:install": "rm -rf node_modules pnpm-lock.yaml && pnpm install",
+    "start:web": "turbo run start --filter=web",
     "clean:apps": "rm -rf apps/backend/node_modules apps/backend/dist apps/web/node_modules apps/web/.next && pnpm run clean:install "
   },
   "devDependencies": {
