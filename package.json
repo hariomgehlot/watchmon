@@ -13,7 +13,9 @@
     "clean:apps": "rm -rf apps/backend/node_modules apps/backend/dist apps/web/node_modules apps/web/.next && pnpm run clean:install "
   },
   "devDependencies": {
+    "@tailwindcss/cli": "^4.1.11",
     "prettier": "^3.6.0",
+    "tailwindcss": "^4.1.11",
     "turbo": "^2.5.4",
     "typescript": "5.8.2"
   },
