@@ -7,8 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/card';
 import { Input } from '@repo/ui/input';
 import { Label } from '@repo/ui/label';
 import { useRouter } from 'next/navigation';
+import { UserIdProvider } from './user-id-provider';
 
-export default function Home() {
+function HomeImpl() {
   const [roomId, setRoomId] = useState('');
   const router = useRouter();
 
@@ -151,5 +152,13 @@ export default function Home() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function Home(props: any) {
+  return (
+    <UserIdProvider>
+      <HomeImpl {...props} />
+    </UserIdProvider>
   );
 }

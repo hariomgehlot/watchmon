@@ -1,44 +1,137 @@
 'use client';
-
-import { useState } from 'react';
-import { ArrowLeft, Upload, Play, Check } from 'lucide-react';
+import { useState, useEffect, useRef, useContext } from 'react';
+import { ArrowLeft, Upload } from 'lucide-react';
 import { Button } from '@repo/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/card';
 import { Input } from '@repo/ui/input';
 import { Label } from '@repo/ui/label';
 import { useRouter } from 'next/navigation';
-import { VideoPlayer } from '@repo/video-player';
+import { VideoPlayer } from '../components/video-player/video-player';
+import { UserIdProvider, UserIdContext } from '../user-id-provider';
+import { useSocket } from '../socket-provider';
 
-export default function CreateRoom() {
+function CreateRoomImpl() {
+
   const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string>('');
   const [roomId, setRoomId] = useState<string>('');
   const [isCreating, setIsCreating] = useState(false);
   const [step, setStep] = useState<'upload' | 'preview' | 'created'>('upload');
+  const [joined, setJoined] = useState(false);
+  const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
+  const [recorderStarted, setRecorderStarted] = useState(false);
+  const [playbackUrl, setPlaybackUrl] = useState<string>('');
+  const [isStarting, setIsStarting] = useState(false);
   const router = useRouter();
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const socket = useSocket();
+  const userId = useContext(UserIdContext);
+  const peerConnections = useRef<{ [viewerId: string]: RTCPeerConnection }>({});
 
-  const handleVideoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedVideo(file);
-      const url = URL.createObjectURL(file);
-      setVideoUrl(url);
-      setStep('preview');
+  // Set playbackUrl when selectedVideo changes
+  useEffect(() => {
+    if (!selectedVideo) return;
+    const url = URL.createObjectURL(selectedVideo);
+    setPlaybackUrl(url);
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [selectedVideo]);
+
+  // Handle viewerJoined: create a new peer connection for each viewer
+  useEffect(() => {
+    if (!socket || !userId || !mediaStream) return;
+    const onViewerJoined = async ({ viewerId }: { viewerId: string }) => {
+      if (peerConnections.current[viewerId]) return; // Already connected
+      const peer = new RTCPeerConnection();
+      peerConnections.current[viewerId] = peer;
+      // Add all tracks
+      mediaStream.getTracks().forEach((track: MediaStreamTrack) => peer.addTrack(track, mediaStream));
+      // Send ICE candidates
+      peer.onicecandidate = (e) => {
+        if (e.candidate) {
+          socket.emit('signal', { roomId, from: userId, to: viewerId, signal: { candidate: e.candidate } });
+        }
+      };
+      // Create offer and send to viewer
+      const offer = await peer.createOffer();
+      await peer.setLocalDescription(offer);
+      socket.emit('signal', { roomId, from: userId, to: viewerId, signal: offer });
+    };
+    socket.on('viewerJoined', onViewerJoined);
+    return () => {
+      socket.off('viewerJoined', onViewerJoined);
+    };
+  }, [socket, userId, mediaStream, roomId]);
+
+  // Handle targeted answers and ICE candidates from viewers
+  useEffect(() => {
+    if (!socket || !userId) return;
+    const onSignal = ({ from, signal }: { from: string; signal: any }) => {
+      const peer = peerConnections.current[from];
+      if (!peer) return;
+      if (signal.type === 'answer') {
+        peer.setRemoteDescription(new RTCSessionDescription(signal));
+      } else if (signal.candidate) {
+        peer.addIceCandidate(new RTCIceCandidate(signal.candidate));
+      }
+    };
+    socket.on('signal', onSignal);
+    return () => {
+      socket.off('signal', onSignal);
+    };
+  }, [socket, userId]);
+
+  // Listen for roomCreated event only after requesting room creation
+  useEffect(() => {
+    if (!socket) return;
+    const onRoomCreated = ({ roomId }: { roomId: string }) => {
+      setRoomId(roomId);
+      socket.emit('joinRoom', { roomId, userId });
+      setJoined(true);
+      setIsCreating(false);
+      setIsStarting(false);
+      setStep('created');
+    };
+    socket.on('roomCreated', onRoomCreated);
+    return () => {
+      socket.off('roomCreated', onRoomCreated);
+    };
+  }, [socket, userId]);
+
+  // Capture the video stream for WebRTC after room is created and video is ready
+  useEffect(() => {
+    if (
+      step !== 'created' ||
+      !joined ||
+      !videoRef.current ||
+      !selectedVideo ||
+      mediaStream // Only capture once
+    ) return;
+
+    // Wait for video to be ready
+    const handleReady = () => {
+      const stream = (videoRef.current as any).captureStream();
+      setMediaStream(stream);
+    };
+
+    if (videoRef.current.readyState >= 2) {
+      handleReady();
+    } else {
+      videoRef.current.addEventListener('loadedmetadata', handleReady, { once: true });
+      return () => {
+        videoRef.current?.removeEventListener('loadedmetadata', handleReady);
+      };
     }
-  };
+  }, [step, joined, selectedVideo, mediaStream]);
 
-  const handleCreateRoom = async () => {
-    setIsCreating(true);
-    // Simulate room creation
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    const generatedRoomId = Math.random().toString(36).substring(2, 8).toUpperCase();
-    setRoomId(generatedRoomId);
-    setStep('created');
-    setIsCreating(false);
-  };
-
-  const handleJoinCreatedRoom = () => {
-    router.push(`/room/${roomId}`);
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setSelectedVideo(f);
+    setVideoUrl(URL.createObjectURL(f));
+    setStep('preview');
   };
 
   const handleBack = () => {
@@ -49,6 +142,19 @@ export default function CreateRoom() {
     } else {
       router.push('/');
     }
+  };
+
+  // Start room and streaming only after clicking Start Watching
+  const handleStartWatching = () => {
+    if (!userId || !socket || !selectedVideo) return;
+    setIsCreating(true);
+    setIsStarting(true);
+    socket.emit('createRoom', { userId });
+    // roomCreated event will handle the rest
+  };
+
+  const handleJoinCreatedRoom = () => {
+    router.push(`/room/${roomId}`);
   };
 
   return (
@@ -86,12 +192,11 @@ export default function CreateRoom() {
               <p className="text-center text-muted-foreground">
                 Choose a video file to share with your friends
               </p>
-              
               <div className="border-2 border-dashed border-purple-500/30 rounded-lg p-8 text-center hover:border-purple-500/50 transition-colors">
                 <input
                   type="file"
                   accept="video/*"
-                  onChange={handleVideoUpload}
+                  onChange={handleFileUpload}
                   className="hidden"
                   id="video-upload"
                 />
@@ -108,106 +213,61 @@ export default function CreateRoom() {
                   </div>
                 </Label>
               </div>
-
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground mb-4">Supported formats: MP4, AVI, MOV, MKV</p>
-                <p className="text-xs text-muted-foreground">Maximum file size: 500MB</p>
-              </div>
             </CardContent>
           </Card>
         )}
 
         {step === 'preview' && selectedVideo && (
-          <div className="max-w-4xl mx-auto space-y-6">
-            <Card className="glass-card border-purple-500/20">
-              <CardHeader>
-                <CardTitle className="text-xl font-bold text-purple-400">Preview Video</CardTitle>
-                <p className="text-muted-foreground">
-                  {selectedVideo.name} • {(selectedVideo.size / 1024 / 1024).toFixed(1)} MB
-                </p>
-              </CardHeader>
-              <CardContent>
+          <Card className="glass-card border-purple-500/20 max-w-2xl mx-auto">
+            <CardHeader className="text-center">
+              <CardTitle className="text-2xl font-bold text-purple-400">Preview Video</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {playbackUrl ? (
                 <VideoPlayer
-                  src={videoUrl}
+                  fileUrl={playbackUrl}
                   title={selectedVideo.name}
                   isHost={true}
+                  isMuted={false}
+                  ref={videoRef}
                 />
-              </CardContent>
-            </Card>
-
-            <div className="flex gap-4 justify-center">
-              <Button
-                onClick={handleBack}
-                variant="outline"
-                className="border-gray-600 text-gray-300 hover:bg-gray-700"
-              >
-                Choose Different Video
+              ) : (
+                <div className="w-full aspect-video bg-black flex items-center justify-center text-gray-400">
+                  No video selected
+                </div>
+              )}
+              <Button onClick={handleStartWatching} className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white" disabled={isCreating || isStarting}>
+                {isCreating || isStarting ? 'Starting...' : 'Start Watching'}
               </Button>
-              <Button
-                onClick={handleCreateRoom}
-                disabled={isCreating}
-                className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white border-0 neon-glow"
-              >
-                {isCreating ? 'Creating Room...' : 'Create Room'}
-                <Play className="ml-2 w-4 h-4" />
-              </Button>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         )}
 
         {step === 'created' && (
-          <Card className="glass-card border-green-500/20 max-w-2xl mx-auto">
+          <Card className="glass-card border-purple-500/20 max-w-2xl mx-auto">
             <CardHeader className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-green-500 to-blue-500 rounded-full mb-4 mx-auto">
-                <Check className="w-8 h-8 text-white" />
-              </div>
-              <CardTitle className="text-2xl font-bold text-green-400">Room Created!</CardTitle>
+              <CardTitle className="text-2xl font-bold text-purple-400">Room Created</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <p className="text-center text-muted-foreground">
-                Your room is ready! Share the room ID with your friends.
+                Room ID: <span className="font-mono text-purple-400">{roomId}</span>
               </p>
-              
-              <div className="bg-background/50 p-4 rounded-lg border border-green-500/20">
-                <Label className="text-sm font-medium text-green-400 mb-2 block">
-                  Room ID
-                </Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={roomId}
-                    readOnly
-                    className="bg-transparent border-green-500/30 text-2xl font-mono text-center text-green-400"
-                  />
-                  <Button
-                    onClick={() => navigator.clipboard.writeText(roomId)}
-                    variant="outline"
-                    className="border-green-500/30 text-green-400 hover:bg-green-500/10"
-                  >
-                    Copy
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  <strong>Video:</strong> {selectedVideo?.name}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  <strong>Size:</strong> {selectedVideo && (selectedVideo.size / 1024 / 1024).toFixed(1)} MB
-                </p>
-              </div>
-
-              <Button
-                onClick={handleJoinCreatedRoom}
-                className="w-full bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white border-0"
-              >
-                Join Room
-                <Play className="ml-2 w-4 h-4" />
+              <Button onClick={handleJoinCreatedRoom} className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white">
+                Go to Room
               </Button>
+              <VideoPlayer fileUrl={playbackUrl} title="Your Stream" isHost isMuted={false} ref={videoRef} />
             </CardContent>
           </Card>
         )}
       </div>
     </div>
+  );
+}
+
+export default function CreateRoom(props: any) {
+  return (
+    <UserIdProvider>
+      <CreateRoomImpl {...props} />
+    </UserIdProvider>
   );
 }

@@ -9,6 +9,7 @@ interface Room {
 @Injectable()
 export class RoomService {
   private rooms: Map<string, Room> = new Map();
+  private userSockets: Map<string, string> = new Map();
 
   createRoom(roomId: string, userId: string) {
     if (!this.rooms.has(roomId)) {
@@ -25,5 +26,18 @@ export class RoomService {
 
   getUsers(roomId: string): string[] {
     return this.rooms.get(roomId)?.users || [];
+  }
+
+  getHostId(roomId: string): string | undefined {
+    const users = this.getUsers(roomId);
+    return users.length > 0 ? users[0] : undefined;
+  }
+
+  setUserSocket(userId: string, socketId: string) {
+    this.userSockets.set(userId, socketId);
+  }
+
+  getSocketId(userId: string): string | undefined {
+    return this.userSockets.get(userId);
   }
 } 

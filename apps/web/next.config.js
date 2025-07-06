@@ -1,23 +1,19 @@
-// next.config.js
-import withTM from 'next-transpile-modules';
+// @ts-check
+ 
+/**
+ * @type {import('next').NextConfig}
+ */
 
-console.log('Loaded next.config.js');
-
-const withTranspileModules = withTM([
-  '@repo/ui',
-  '@repo/lib', // add all shared TS packages
-]);
 
 const nextConfig = {
-  reactStrictMode: true,
   async rewrites() {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:3001/api/:path*',
+        destination: 'http://localhost:3001/api/:path*', // must match your backend prefix and port
       },
     ];
   },
-};
-
-export default withTranspileModules(nextConfig);
+}
+ 
+export default nextConfig

@@ -11,30 +11,29 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "@repo/lib": "workspace:*",
-    "@repo/ui": "workspace:*",
-    "date-fns": "^3.6.0",
-    "lucide-react": "^0.446.0",
-    "next": "13.5.1",
-    "next-themes": "^0.3.0",
-    "react": "18.2.0",
-    "next-transpile-modules": "^10.0.1",
-    "react-dom": "18.2.0"
+    "@radix-ui/react-slot": "^1.2.3",
+    "autoprefixer": "^10.4.21",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.523.0",
+    "next": "^15.3.0",
+    "postcss": "^8.5.6",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
-    "class-variance-authority": "^0.7.0",
-    "@repo/tailwind-config": "workspace:^",
-    "tailwindcss-animate": "^1.0.7",
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
-    "@tailwindcss/postcss": "^4.1.11",
-    "@types/node": "^20.6.2",
+    "@repo/ui": "workspace:*",
+    "@tailwindcss/postcss": "^4.1.10",
+    "@types/node": "^22.15.3",
     "@types/react": "19.1.0",
     "@types/react-dom": "19.1.1",
-    "autoprefixer": "^10.4.15",
-    "eslint": "^8.49.0",
-    "postcss": "^8.4.30",
-    "tailwindcss": "^4.1.11",
-    "typescript": "5.2.2"
+    "eslint": "^9.29.0",
+    "tailwind-merge": "^3.3.1",
+    "tailwindcss": "^4.1.10",
+    "tailwindcss-animate": "^1.0.7",
+    "typescript": "5.8.2"
   }
 }
