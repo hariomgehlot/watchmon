@@ -3,6 +3,7 @@ import '../index.css'
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { SocketProvider } from './socket-provider';
+import { StunProvider } from './stun-provider';
 // import { UserIdProvider } from './user-id-provider';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -21,7 +22,9 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className={inter.className}>
         <SocketProvider>
-          {children}
+          <StunProvider>
+            {children}
+          </StunProvider>
         </SocketProvider>
       </body>
     </html>

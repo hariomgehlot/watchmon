@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { VideoPlayer } from "../components/video-player/video-player";
 import { UserIdProvider, UserIdContext } from "../user-id-provider";
 import { useSocket } from "../socket-provider";
+import { useStunServer } from '../stun-provider';
 
 function CreateRoomImpl() {
   const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
@@ -28,6 +29,7 @@ function CreateRoomImpl() {
   const userId = useContext(UserIdContext);
   const peerConnections = useRef<{ [viewerId: string]: RTCPeerConnection }>({});
   const isRemoteActionRef = useRef(false);
+  const { stunServer, loading: stunLoading, error: stunError } = useStunServer();
 
   // Set playbackUrl when selectedVideo changes
   useEffect(() => {
@@ -41,13 +43,17 @@ function CreateRoomImpl() {
 
   // Handle viewerJoined: create a new peer connection for each viewer
   useEffect(() => {
-    if (!socket || !userId || !mediaStream) return;
+    if (!socket || !userId || !mediaStream || stunLoading || !stunServer) return;
     const onViewerJoined = async ({ viewerId }: { viewerId: string }) => {
       if (peerConnections.current[viewerId]) {
         peerConnections.current[viewerId].close();
         delete peerConnections.current[viewerId];
       }
-      const peer = new RTCPeerConnection();
+      const peer = new RTCPeerConnection({
+        iceServers: [
+          { urls: `stun:${stunServer}` }
+        ]
+      });
       peerConnections.current[viewerId] = peer;
       // Add all tracks
       mediaStream.getTracks().forEach((track: MediaStreamTrack) => {
@@ -86,7 +92,7 @@ function CreateRoomImpl() {
     return () => {
       socket.off("viewerJoined", onViewerJoined);
     };
-  }, [socket, userId, mediaStream, roomId]);
+  }, [socket, userId, mediaStream, roomId, stunLoading, stunServer]);
 
   // Handle targeted answers and ICE candidates from viewers
   useEffect(() => {
@@ -241,6 +247,30 @@ function CreateRoomImpl() {
   const handleJoinCreatedRoom = () => {
     router.push(`/room/${roomId}`);
   };
+
+  if (stunLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Card className="glass-card border-purple-500/20">
+          <CardContent className="p-8 text-center">
+            <div className="animate-spin w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-purple-400">Finding the closest STUN server...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  if (stunError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Card className="glass-card border-red-500/20">
+          <CardContent className="p-8 text-center">
+            <p className="text-red-400">Error finding STUN server: {stunError}</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-purple-950/20 relative overflow-hidden">

@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { useSocket } from '@/app/socket-provider';
 import { VideoPlayer } from '@/app/components/video-player/video-player';
 import { UserIdContext, UserIdProvider } from '@/app/user-id-provider';
+import { useStunServer } from '@/app/stun-provider';
 
 function RoomClientImpl({ roomId }: { roomId: string }) {
   const [isConnected, setIsConnected] = useState(false);
@@ -29,10 +30,11 @@ function RoomClientImpl({ roomId }: { roomId: string }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [videoName, setVideoName] = useState<string | null>(null);
+  const { stunServer, loading: stunLoading, error: stunError } = useStunServer();
 
   // WebRTC: Handle incoming offer, ICE, and send answer
   useEffect(() => {
-    if (!socket || !userId) return;
+    if (!socket || !userId || stunLoading || !stunServer) return;
     // Join the room
     socket.emit('joinRoom', { roomId, userId });
     // Request video name from host/server
@@ -57,7 +59,11 @@ function RoomClientImpl({ roomId }: { roomId: string }) {
         }
         setHostId(from);
         hostIdRef.current = from;
-        const peer = new RTCPeerConnection();
+        const peer = new RTCPeerConnection({
+          iceServers: [
+            { urls: `stun:${stunServer}` }
+          ]
+        });
         peerRef.current = peer;
         // Handle remote stream
         peer.ontrack = (e) => {
@@ -104,7 +110,7 @@ function RoomClientImpl({ roomId }: { roomId: string }) {
       socket.off('userJoined');
       socket.off('videoName', onVideoName);
     };
-  }, [socket, userId, roomId, hostId]);
+  }, [socket, userId, roomId, hostId, stunLoading, stunServer]);
 
   useEffect(() => {
     setIsConnected(true);
@@ -193,6 +199,31 @@ function RoomClientImpl({ roomId }: { roomId: string }) {
     }, 3000);
     return () => clearTimeout(timeout);
   }, [mediaStream]);
+
+  if (stunLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Card className="glass-card border-purple-500/20">
+          <CardContent className="p-8 text-center">
+            <div className="animate-spin w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-purple-400">Finding the closest STUN server...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (stunError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Card className="glass-card border-red-500/20">
+          <CardContent className="p-8 text-center">
+            <p className="text-red-400">Error finding STUN server: {stunError}</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (notFound) {
     return (
